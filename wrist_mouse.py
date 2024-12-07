@@ -4,14 +4,23 @@ jump to a layer with quadrant hops and click buttons
 record the current wrist position
 
 
+current state: draft of connection and movement primatives
+next: 
+- [ ] get hardware connected
+- [ ] keybinding for layers + layer switch + tracker activation
+- [ ] use, tune smoothing
+- [ ] future: curved plane establishment hotkey
+
 """
 import time
 import threading
+from typing import Self
 import numpy as np
-from talon import ctrl, ui
+from talon import ctrl, ui, Module
 from talon.screen import Screen
 from touch_sdk.watch import Watch, SensorFrame,Hand
 
+mod = Module()
 
 screen: Screen = ui.screens()[0]
 
@@ -33,10 +42,12 @@ class CursorMovementThread(threading.Thread):
             return
         step = max(0.0001, distance / 12)  # Smoother movement
         if distance != 0:
+        #if distance > 0.0001:
             step_x = (self.target_x - self.current_x) / distance * step
             step_y = (self.target_y - self.current_y) / distance * step
             self.current_x += step_x
             self.current_y += step_y
+            print(f"ctrl.mouse_move({self.current_x=}, {self.current_y=})")
             ctrl.mouse_move(self.current_x, self.current_y)#_pause=False)
 
 
@@ -60,13 +71,21 @@ class CursorMovementThread(threading.Thread):
     def stop(self):
         self.running = False
 
-# Initialize the movement and scroll threads
-movement_thread = CursorMovementThread()
-movement_thread.start()
-
-:
 class MouseWatch(Watch):
-    scale = 30
+    scale: int = 30
+    is_tracking: bool = False
+
+    def __init__(self, name_filter: str|None =None):
+        super().__init__(name_filter=name_filter)
+        # Initialize the movement and scroll threads
+        #self.movement_thread = CursorMovementThread()
+        #self.movement_thread.start()
+
+    def start(self):
+        super().start()
+        # For now we have the movement thread always going,
+        # but may want to account for other mouse takeover actions or something
+        #self.movement_thread.active = True
 
     def resolve_relative_delta(self, sensor_frame: SensorFrame) -> tuple[float, float, float]:
         # copied from _on_arm_direction_change then mangeld 
@@ -101,10 +120,20 @@ class MouseWatch(Watch):
    #        self.pinch_state = False
    #        pyautogui.mouseUp(_pause=False)
     def on_sensors(self, sensor: SensorFrame):
+        if not self.is_tracking:
+            return
         delta_z, delta_y, delta_x = self.resolve_relative_delta(sensor)
-        movement_thread.update_target(delta_x,delta_z)
-
-
+        ctrl.mouse_move(delta_x,delta_z)#_pause=False)
+        #self.movement_thread.update_target(delta_x,delta_z)
 
 watch = MouseWatch()
 watch.start()
+@mod.action_class
+class TalonWristMouse:
+    def toggle_wrist_mouse_tracking():
+        watch.is_tracking = not watch.is_tracking
+        print(f"{watch.is_tracking=}")
+
+    #def establish_tracking_plane(self: Self):
+    #    # TODO
+    #    pass
