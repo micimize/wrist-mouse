@@ -1,4 +1,5 @@
-key(f12):
-  wrist_mouse.toggle()
+key(f20):
+  user.enable_wrist_mouse_tracking()
 
-wrist mouse toggle: user.toggle_wrist_mouse_tracking()
+key(f19):
+  user.disable_wrist_mouse_tracking()
