@@ -19,7 +19,3 @@ class TalonWristMouse:
         "disable_wrist_mouse_tracking"
         set_tracking_mode(None)
         print(f"disable {poll_tracking_mode()=}")
-
-    #def establish_tracking_plane(self: Self):
-    #    # TODO
-    #    pass
