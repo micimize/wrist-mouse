@@ -1,5 +1,5 @@
 from talon import Module
-from .wrist_mouse_tracker import TrackingMode, poll_tracking_mode, set_tracking_mode
+from .wrist_mouse_config import TrackingMode, poll_tracking_mode, set_tracking_mode, toggle_wrist_mouse_tracking
 
 mod = Module()
 
@@ -7,15 +7,15 @@ mod = Module()
 class TalonWristMouse:
     def toggle_wrist_mouse_tracking():
         "toggle_wrist_mouse_tracking"
-        set_tracking_mode(None if poll_tracking_mode() else TrackingMode.PLANAR)
+        toggle_wrist_mouse_tracking()
         print(f"{poll_tracking_mode()=}")
 
     def enable_wrist_mouse_tracking():
         "enable_wrist_mouse_tracking"
-        set_tracking_mode(TrackingMode.PLANAR)
+        set_tracking_mode(TrackingMode.HAND_UP)
         print(f"enable {poll_tracking_mode()=}")
 
     def disable_wrist_mouse_tracking():
         "disable_wrist_mouse_tracking"
-        set_tracking_mode(None)
+        set_tracking_mode(TrackingMode.OFF)
         print(f"disable {poll_tracking_mode()=}")

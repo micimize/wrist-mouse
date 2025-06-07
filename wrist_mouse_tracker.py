@@ -1,51 +1,33 @@
-# this is a separate script because:
-# 1. the bluetooth dependency had some obscure error when running within talon
-# 2. having a sidecar process will probably make testing and reuse easier
-# pip install pyautogui
-from enum import Enum
-from pathlib import Path
+# pip install pyautogui touch_sdk
+import pyautogui
+from touch_sdk.watch import Watch
+from wrist_mouse.wrist_mouse_config import TrackingMode, poll_tracking_mode
 
-try:
-    import pyautogui
-    import numpy as np
-    from scipy.spatial.transform import Rotation
-    from touch_sdk.watch import Watch, SensorFrame, Hand
-except ImportError:
-    pass
+class MouseWatch(Watch):
+    base_speed: int = 40
+    acceleration: float = 0
+    
+    def on_arm_direction_change(self, delta_x: float, delta_y: float):
+        if not poll_tracking_mode() == TrackingMode.HAND_UP:
+            return
+        scaled_x = self.base_speed * delta_x
+        scaled_y = self.base_speed * delta_y
+        return pyautogui.moveRel(scaled_x, scaled_y, duration=0.01, _pause=False)
+        
 
+if __name__ == "__main__":
+    watch = MouseWatch()
+    watch.start()
+   
 
+"""SCRATCHPAD/NOTES from earlier efforts
 
-class TrackingMode(Enum):
-    ROTATIONAL = "ROTATIONAL"
-    PLANAR = "PLANAR"
+import numpy as np
+from scipy.spatial.transform import Rotation
+from touch_sdk.watch import SensorFrame, Hand
 
-PLAYBACK_DUMP_FILE = Path('./positions.jsonl')
-
-# TODO use as single source of truth for config, probably
-TOGGLE_FILE = Path('~/.talon/wrist_mouse_toggle').expanduser()
-
-
-_mode: TrackingMode | None = None
-_last_poll_time = 0.0
-def poll_tracking_mode() -> TrackingMode | None:
-    global _mode, _last_poll_time
-    if not TOGGLE_FILE.exists():
-        return None
-    last_file_update = TOGGLE_FILE.stat().st_mtime
-    if last_file_update == _last_poll_time:
-        return _mode
-    with TOGGLE_FILE.open('r') as f:
-        _last_poll_time = last_file_update
-        text = f.read().strip()
-        _mode = None if text == "" else TrackingMode(text)
-    print(f"polling tracking mode changed to {_mode}")
-    return _mode
-
-def set_tracking_mode(mode: TrackingMode | None):
-    TOGGLE_FILE.write_text(mode.value if mode else "")
-
-
-"""
+A potential option for controlling the toggle from the main script.
+Probably better to just outsource to whatever hotkey or voice control system the user might use elsewhere due to permissions troubles
     from pynput import keyboard
 def listen_for_tracking_key_toggles_in_background(enable_tracking: keyboard.KeyCode, disable_tracking: keyboard.KeyCode) -> keyboard.Listener:
     def on_press(key: keyboard.Key | keyboard.KeyCode | None):
@@ -62,19 +44,22 @@ def listen_for_tracking_key_toggles_in_background(enable_tracking: keyboard.KeyC
     listener.start()
     print(f"toggle listener started for {enable_tracking=} and {disable_tracking=}")
     return listener
-"""
 
 
+    various ill-fated efforts to get hands-down tracking to work
 
+    def resolve_relative_delta(self, sensor_frame: SensorFrame) -> tuple[float, float, float]:
+        # def normalize(vector):
+        #     length = sum(x * x for x in vector) ** 0.5
+        #     return [x / length for x in vector]
 
+        # grav = normalize(sensor_frame.gravity)
+        rot = Rotation.from_quat([*sensor_frame.orientation])
+        handedness_scale = -1 if self._hand == Hand.LEFT else 1
+        rot = Rotation.from_quat([*sensor_frame.orientation])
+        z, y, x =  rot.apply(sensor_frame.angular_velocity, inverse=True)
+        return x, y, z
 
-
-if __name__ == "__main__":
-
-    # TODO: bad but still using talon keybindings and dont want to deal with the odd environment issues
-    class MouseWatch(Watch):
-        base_speed: int = 40
-        acceleration: float = 0
 
     #def resolve_relative_delta(self, sensor_frame: SensorFrame) -> tuple[float, float, float]:
     #    # copied from _on_arm_direction_change then mangeld 
@@ -96,13 +81,6 @@ if __name__ == "__main__":
 
     #    return delta_x, delta_y, delta_z
 
-        def resolve_relative_delta(self, sensor_frame: SensorFrame) -> tuple[float, float, float]:
-            rot = Rotation.from_quat([*sensor_frame.orientation])
-            handedness_scale = -1 if self._hand == Hand.LEFT else 1
-            x, y, z =  rot.apply(sensor_frame.angular_velocity, inverse=True)
-            return x, y, z
-
-
     #pinch_state = False
     #def on_gesture_probability(self, prob):
     #    if prob >= 0.5 and not self.pinch_state:
@@ -111,34 +89,18 @@ if __name__ == "__main__":
     #    elif prob < 0.5 and self.pinch_state:
     #        self.pinch_state = False
     #        pyautogui.mouseUp(_pause=False)
-    #def on_sensors(self, sensor: SensorFrame):
-    #    if not self.tracking_mode == TrackingMode.ROTATIONAL:
-    #        return
-    #    delta_x, delta_y, delta_z = self.resolve_relative_delta(sensor)
-    #    if not self.is_tracking:
-    #        return
-    #    self.movement_thread.update_target(delta_x,delta_z)
-
-        def on_arm_direction_change(self, delta_x: float, delta_y: float):
-            if not poll_tracking_mode() == TrackingMode.PLANAR:
-                return
-
-            return pyautogui.moveRel(
-                self.base_speed * delta_x, self.base_speed * delta_y,
-                #scaled_x, scaled_y,
-                duration=0.01,
-                _pause=False
-            )
-            #print(f"{delta_x=}, {delta_y=}")
-            # todo not really working right
-            total_distance = abs(np.hypot(delta_x, delta_y))
-            scaled = total_distance * self.base_speed + (total_distance * self.acceleration) ** 2
-            scaled_x = delta_x * scaled / total_distance
-            scaled_y = delta_y * scaled / total_distance
-    watch = MouseWatch()
-   #listener = listen_for_tracking_key_toggles_in_background(
-   #    enable_tracking=keyboard.Key.f20, 
-   #    disable_tracking=keyboard.Key.f19
-   #)
-    watch.start()
-    #listener.join()
+        # def on_sensors(self, sensor: SensorFrame):
+        #     tracking_mode=poll_tracking_mode()
+        #     if not tracking_mode:
+        #         return
+        #     delta_x, delta_y, delta_z = self.resolve_relative_delta(sensor)
+        #     if tracking_mode == TrackingMode.HORIZONTAL:
+        #         delta_y=delta_z
+        #     return pyautogui.moveRel(
+        #         self.base_speed * delta_x, self.base_speed * delta_y,
+        #         #scaled_x, scaled_y,
+        #         duration=0.01,
+        #         _pause=False
+        #     )
+    """
+            
