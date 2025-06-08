@@ -17,7 +17,7 @@ WRIST_MOUSE_TOGGLE_STATE_PATH: Final = Path(os.environ.get(
 
 
 class TrackingMode(Enum):
-    OFF = ""
+    OFF = "OFF"
     HAND_UP = "HAND_UP"
     # TODO: The idea here is to eventually have a mode for standing with hands prone to sides,
     # but I haven't gotten the math to be goodly yet
@@ -36,7 +36,7 @@ def poll_tracking_mode() -> TrackingMode:
 
     with WRIST_MOUSE_TOGGLE_STATE_PATH.open('r') as f:
         _last_poll_time = last_file_update
-        text = f.read().strip()
+        text = f.read().strip() or "OFF"
         _mode = TrackingMode(text)
 
     print(f"newly polled tracking mode: {_mode}")
@@ -64,5 +64,5 @@ if __name__ == "__main__":
     elif action == "set":
         assert len(sys.argv) > 2, "no value to set to mode"
         value = sys.argv[2]
-        assert value in (TrackingMode.OFF, TrackingMode.HAND_UP)
-        set_tracking_mode(value)
+        assert value in (TrackingMode.OFF.value, TrackingMode.HAND_UP.value)
+        set_tracking_mode(TrackingMode(value))

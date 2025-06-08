@@ -10,14 +10,37 @@ in tandem with a keyboard layer as a mouse substitute.
 
 ```json
 {
-    "description": "Toggle wrist_mouse state",
+    "description": "Toggle wrist_mouse state via dygma macros",
     "manipulators": [
         {
             "type": "basic",
-            "from": {
-                "key_code": "f22"
-            },
-            "to": [{ "shell_command": "/bin/python /Users/mjr/.talon/user/wrist_mouse/wrist_mouse_config.py toggle" }]
+            "from": { "key_code": "f20" },
+            "to": [
+              {
+                "shell_command": "/usr/local/bin/python3 /Users/mjr/.talon/user/wrist_mouse/wrist_mouse_config.py set HAND_UP"
+              },
+              {
+                "set_notification_message": {
+                  "id": "wrist_mouse_tracking",
+                  "text": "wrist mouse tracking"
+                }
+              }
+            ]
+        },
+        {
+            "type": "basic",
+            "from": { "key_code": "f19" },
+            "to": [
+              {
+                "shell_command": "/usr/local/bin/python3 /Users/mjr/.talon/user/wrist_mouse/wrist_mouse_config.py set OFF"
+              },
+              {
+                "set_notification_message": {
+                  "id": "wrist_mouse_tracking",
+                  "text": ""
+                }
+              }
+            ]
         }
     ]
 }
