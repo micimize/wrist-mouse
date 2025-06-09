@@ -8,6 +8,7 @@ in tandem with a keyboard layer as a mouse substitute.
 * `wrist_mouse_config.py toggle|set OFF|HAND_UP` will write the mode to 
 * The talon integration piece is in wrist_mouse_toggler.py
 
+NOTE: you have to activate the defy first
 ```json
 {
     "description": "Toggle wrist_mouse state via dygma macros",

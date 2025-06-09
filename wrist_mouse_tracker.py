@@ -1,20 +1,76 @@
 # pip install pyautogui touch_sdk
+from asyncio import run
+from dataclasses import dataclass
+from functools import cached_property
+from typing import Final
 import pyautogui
 from touch_sdk.watch import Watch
 from wrist_mouse.wrist_mouse_config import TrackingMode, poll_tracking_mode
+from time import sleep
+from datetime import datetime
+
+@dataclass
+class _BatteryCheckin:
+    checkin_time: datetime
+    remaining_battery: float
+
+    def is_time_for_new_checkin(self, checkin_interval_in_seconds: int) -> bool:
+        if self.remaining_battery < 0:
+            return True
+        elapsed_seconds = (datetime.now() -  self.checkin_time).total_seconds()
+        return elapsed_seconds > checkin_interval_in_seconds
+
+def report_battery_info(previous: _BatteryCheckin, latest: _BatteryCheckin) -> None:
+    elapsed_seconds = (latest.checkin_time - previous.checkin_time).total_seconds()
+    elapsed_minutes = int(elapsed_seconds / 60)
+    drained = latest.remaining_battery - previous.remaining_battery
+    if previous.remaining_battery == -1:
+        drained = 100 - latest.remaining_battery
+    current_battery = latest.remaining_battery
+    time = f"{latest.checkin_time}".rsplit(":", 1)[0]
+    print(f"{time}: {current_battery=}%, {drained=}% over {elapsed_minutes}min")
+
 
 class MouseWatch(Watch):
     base_speed: int = 40
     acceleration: float = 0
+    battery_checkin_interval_in_seconds: int = 600
+    last_battery_checkin: _BatteryCheckin = _BatteryCheckin(datetime.now(), -1)
+    is_update_info_requested: bool = False
+
+    def is_time_to_checkin_on_battery(self) -> bool:
+        if self.is_update_info_requested:
+            return False
+        if self.battery_percentage == -1:
+            return True
+        return self.last_battery_checkin.is_time_for_new_checkin(self.battery_checkin_interval_in_seconds)
+
+    def _checkin_and_report_on_battery(self) -> None:
+        new_checkin = _BatteryCheckin(datetime.now(), self.battery_percentage)
+        report_battery_info(self.last_battery_checkin, new_checkin)
+        self.last_battery_checkin = new_checkin
+    
+    def on_info_update(self):
+        self._checkin_and_report_on_battery()
+        self.is_update_info_requested = False
+
+    # battery won't update unless we force the re-request, which happens in _fetch_info
+    def force_update_info(self) -> None:
+        if self.is_update_info_requested:
+            return
+        self.is_update_info_requested = True
+        assert self._event_loop is not None
+        self._event_loop.create_task(self._fetch_info(self._client))
     
     def on_arm_direction_change(self, delta_x: float, delta_y: float):
+        if self.is_time_to_checkin_on_battery():
+            self.force_update_info()
         if not poll_tracking_mode() == TrackingMode.HAND_UP:
             return
         scaled_x = self.base_speed * delta_x
         scaled_y = self.base_speed * delta_y
         return pyautogui.moveRel(scaled_x, scaled_y, duration=0.01, _pause=False)
         
-
 if __name__ == "__main__":
     watch = MouseWatch()
     watch.start()
