@@ -7,53 +7,12 @@ import os
 from pathlib import Path
 import sys
 from typing import Final, Tuple
-from dataclasses import dataclass
-import json
 
 
 WRIST_MOUSE_TOGGLE_STATE_PATH: Final = Path(os.environ.get(
     "WRIST_MOUSE_TRACKING_STATE_PATH",
     "~/.config/wrist_mouse/tracking_state"   
 )).expanduser()
-
-WRIST_MOUSE_CONFIG_PATH: Final = Path(os.environ.get(
-    "WRIST_MOUSE_CONFIG_PATH",
-    "~/.config/wrist_mouse/config.json"
-)).expanduser()
-
-
-@dataclass
-class AccelerationConfig:
-    """Configuration for macOS-style mouse acceleration.
-    
-    Parameters:
-    - enabled: Whether acceleration is enabled (true/false)
-    - curve: Power curve exponent (1.0 = linear, 1.5-2.5 recommended for acceleration)
-    - threshold: Minimum speed before acceleration kicks in (0.001-0.1, lower = more sensitive)
-    - max_acceleration: Maximum acceleration multiplier (1.0-5.0, higher = faster at high speeds)
-    - base_speed: Base movement speed multiplier (10-100, higher = more sensitive overall)
-    """
-    enabled: bool = True
-    curve: float = 1.7  # Power curve exponent (1.0 = linear, >1.0 = acceleration)
-    threshold: float = 0.01  # Minimum speed before acceleration kicks in
-    max_acceleration: float = 3.0  # Maximum acceleration multiplier
-    base_speed: int = 40  # Base movement speed multiplier
-
-
-def load_acceleration_config() -> AccelerationConfig:
-    """Load acceleration configuration from file, or return default if file doesn't exist."""
-    if not WRIST_MOUSE_CONFIG_PATH.exists():
-        return AccelerationConfig()
-    
-    try:
-        with WRIST_MOUSE_CONFIG_PATH.open('r') as f:
-            config_data = json.load(f)
-        return AccelerationConfig(**config_data)
-    except (json.JSONDecodeError, TypeError, ValueError) as e:
-        print(f"Error loading config, using defaults: {e}")
-        return AccelerationConfig()
-
-
 
 
 
@@ -85,7 +44,7 @@ def poll_tracking_mode() -> TrackingMode:
 
 def set_tracking_mode(mode: TrackingMode):
     if not WRIST_MOUSE_TOGGLE_STATE_PATH.exists():
-        WRIST_MOUSE_TOGGLE_STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        WRIST_MOUSE_TOGGLE_STATE_PATH.parent.mkdir()
         WRIST_MOUSE_TOGGLE_STATE_PATH.touch(exist_ok=True)
 
     WRIST_MOUSE_TOGGLE_STATE_PATH.write_text(mode.value)

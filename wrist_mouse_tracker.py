@@ -5,10 +5,9 @@ from functools import cached_property
 from typing import Final
 import pyautogui
 from touch_sdk.watch import Watch
-from wrist_mouse.wrist_mouse_config import TrackingMode, poll_tracking_mode, load_acceleration_config, AccelerationConfig
+from wrist_mouse.wrist_mouse_config import TrackingMode, poll_tracking_mode
 from time import sleep
 from datetime import datetime
-import math
 
 @dataclass
 class _BatteryCheckin:
@@ -33,12 +32,11 @@ def report_battery_info(previous: _BatteryCheckin, latest: _BatteryCheckin) -> N
 
 
 class MouseWatch(Watch):
-    def __init__(self):
-        super().__init__()
-        self.config = load_acceleration_config()
-        self.battery_checkin_interval_in_seconds: int = 600
-        self.last_battery_checkin: _BatteryCheckin = _BatteryCheckin(datetime.now(), -1)
-        self.is_update_info_requested: bool = False
+    base_speed: int = 40
+    acceleration: float = 0
+    battery_checkin_interval_in_seconds: int = 600
+    last_battery_checkin: _BatteryCheckin = _BatteryCheckin(datetime.now(), -1)
+    is_update_info_requested: bool = False
 
     def is_time_to_checkin_on_battery(self) -> bool:
         if self.is_update_info_requested:
@@ -64,45 +62,13 @@ class MouseWatch(Watch):
         assert self._event_loop is not None
         self._event_loop.create_task(self._fetch_info(self._client))
     
-    def _apply_acceleration(self, delta_x: float, delta_y: float) -> tuple[float, float]:
-        """Apply macOS-style acceleration to movement deltas."""
-        if not self.config.enabled:
-            return delta_x, delta_y
-        
-        # Calculate the magnitude of movement
-        magnitude = math.sqrt(delta_x * delta_x + delta_y * delta_y)
-        
-        if magnitude < self.config.threshold:
-            # No acceleration for very small movements
-            return delta_x, delta_y
-        
-        # Calculate acceleration multiplier using power curve
-        # Normalized magnitude (0-1) raised to the power curve
-        normalized_magnitude = min(magnitude, 1.0)  # Cap at 1.0 for stability
-        acceleration_factor = math.pow(normalized_magnitude, self.config.curve)
-        
-        # Apply max acceleration limit
-        acceleration_factor = min(acceleration_factor * self.config.max_acceleration, self.config.max_acceleration)
-        
-        # Apply acceleration to both axes proportionally
-        accelerated_x = delta_x * acceleration_factor
-        accelerated_y = delta_y * acceleration_factor
-        
-        return accelerated_x, accelerated_y
-    
     def on_arm_direction_change(self, delta_x: float, delta_y: float):
         if self.is_time_to_checkin_on_battery():
             self.force_update_info()
         if not poll_tracking_mode() == TrackingMode.HAND_UP:
             return
-        
-        # Apply acceleration to the raw deltas
-        accelerated_x, accelerated_y = self._apply_acceleration(delta_x, delta_y)
-        
-        # Scale by base speed
-        scaled_x = self.config.base_speed * accelerated_x
-        scaled_y = self.config.base_speed * accelerated_y
-        
+        scaled_x = self.base_speed * delta_x
+        scaled_y = self.base_speed * delta_y
         return pyautogui.moveRel(scaled_x, scaled_y, duration=0.01, _pause=False)
         
 if __name__ == "__main__":
